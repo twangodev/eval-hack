@@ -125,34 +125,16 @@ def rank(
     judgments: Path = typer.Option(
         None, "--judgments", help="Judgments JSONL (default: data/{config}/judgments.jsonl)"
     ),
-    out_dir: Path = typer.Option(
-        None, "--out-dir", "-o", help="Output dir (default: data/{config}/)"
-    ),
     ks: list[int] = typer.Option(
-        [10, 20, 50], "--k", help="K values for recall@K (repeatable)"
+        [1, 5, 10, 20, 50], "--k", help="K values for recall@K (repeatable)"
     ),
+    top: int = typer.Option(20, "--top", help="How many top projects to print"),
 ) -> None:
-    """Fit Bradley-Terry on judgments → ranking.parquet + eval.json."""
+    """Fit Bradley-Terry on judgments and print ranking + recall@K to stdout."""
     from devpost import rank as rank_mod
 
     judgments = judgments or Path(f"data/{config}/judgments.jsonl")
-    out_dir = out_dir or Path(f"data/{config}/")
-    summary = rank_mod.run(config, judgments, out_dir, ks)
-    typer.echo(
-        f"[{config}] {summary['n_projects_appeared']}/{summary['n_projects']} projects ranked, "
-        f"{summary['n_judgments']} judgments ({summary['n_invalid']} invalid)"
-    )
-    typer.echo(
-        f"  winners ranked: {summary['n_winners_appeared']}/{summary['n_winners']}"
-    )
-    if summary["mean_winner_rank_pct"] is not None:
-        typer.echo(
-            f"  winner rank percentile: median={summary['median_winner_rank_pct']:.3f} "
-            f"mean={summary['mean_winner_rank_pct']:.3f}"
-        )
-    for k, recall in summary["recall_at_k"].items():
-        typer.echo(f"  recall@{k}: {recall:.3f}")
-    typer.echo(f"wrote {out_dir/'ranking.parquet'} + {out_dir/'eval.json'}")
+    rank_mod.run(config, judgments, ks, top=top)
 
 
 @app.command()

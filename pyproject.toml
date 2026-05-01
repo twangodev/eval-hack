@@ -9,6 +9,7 @@ dependencies = [
     "openai>=1.50",
     "choix>=0.3.5",
     "datasets>=4.8.5",
+    "rich>=15.0.0",
 ]
 
 [project.scripts]
