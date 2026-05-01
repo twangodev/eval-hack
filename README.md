@@ -1,4 +1,4 @@
-# Canh we do n LLMs Judge Hackathons?
+# Can LLMs Judge Hackathons?
 
 Evaluating whether LLMs can judge hackathons in agreement with human judges.
 Scraping lives in a separate repo; this one covers enrichment, pairwise
