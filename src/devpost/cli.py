@@ -138,6 +138,18 @@ def rank(
 
 
 @app.command()
+def summary(
+    ks: list[int] = typer.Option(
+        [1, 5, 10, 20, 50], "--k", help="K values for recall@K (repeatable)"
+    ),
+) -> None:
+    """Aggregate cross-hackathon eval — the headline top-1 winner-match rate."""
+    from devpost import summary as summary_mod
+
+    summary_mod.run(ks)
+
+
+@app.command()
 def finalize(
     judgments: Path = typer.Option(..., "--judgments", help="Judgments JSONL"),
     out_dir: Path = typer.Option(

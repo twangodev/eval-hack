@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import choix
@@ -39,14 +40,31 @@ def _build_outcomes(
     return outcomes, idx, invalid
 
 
-def run(
-    config: str,
-    judgments_path: Path,
-    ks: list[int],
-    top: int = 20,
-) -> None:
-    console = Console()
+@dataclass
+class RankResult:
+    config: str
+    n_projects: int
+    n_appeared: int
+    n_winners: int
+    n_winners_appeared: int
+    n_judgments: int
+    n_invalid: int
+    log_skill: np.ndarray
+    pairs_per: np.ndarray
+    projects: list[dict]
+    idx: dict[str, int]
+    appeared_ids: list[str]
+    rank_of: dict[str, int]
+    winner_ids: set[str]
+    winner_pcts: list[float]
+    recall_at_k: dict[int, float]
+    top1_id: str | None
+    top1_project: dict | None
+    top1_hit: bool
 
+
+def compute(config: str, judgments_path: Path, ks: list[int]) -> RankResult:
+    """Fit BT and compute eval metrics for one hackathon. No I/O."""
     projects = [p for p in _load_hf_projects(config) if _is_valid(p)]
     project_ids = [_project_id(p) for p in projects]
     winner_ids = {pid for pid, p in zip(project_ids, projects) if p.get("is_winner")}
@@ -79,32 +97,72 @@ def run(
     n_winners_appeared = len(appeared_winners)
     winner_pcts = [rank_of[w] / max(n_appeared, 1) for w in appeared_winners]
 
+    recall_at_k: dict[int, float] = {}
+    for k in ks:
+        top_k = set(appeared_ids[:k])
+        hits = sum(1 for w in appeared_winners if w in top_k)
+        recall_at_k[k] = hits / max(n_winners, 1)
+
+    top1_id = appeared_ids[0] if appeared_ids else None
+    top1_project = projects[idx[top1_id]] if top1_id else None
+    top1_hit = top1_id in winner_ids if top1_id else False
+
+    return RankResult(
+        config=config,
+        n_projects=n,
+        n_appeared=n_appeared,
+        n_winners=n_winners,
+        n_winners_appeared=n_winners_appeared,
+        n_judgments=len(judgments),
+        n_invalid=n_invalid,
+        log_skill=log_skill,
+        pairs_per=pairs_per,
+        projects=projects,
+        idx=idx,
+        appeared_ids=appeared_ids,
+        rank_of=rank_of,
+        winner_ids=winner_ids,
+        winner_pcts=winner_pcts,
+        recall_at_k=recall_at_k,
+        top1_id=top1_id,
+        top1_project=top1_project,
+        top1_hit=top1_hit,
+    )
+
+
+def run(
+    config: str,
+    judgments_path: Path,
+    ks: list[int],
+    top: int = 20,
+) -> None:
+    console = Console()
+    r = compute(config, judgments_path, ks)
+
     # ── header ──
     console.print(
-        f"[bold]{config}[/]  "
-        f"{n_appeared}/{n} projects ranked  ·  "
-        f"{len(judgments)} judgments  ·  "
-        f"[yellow]{n_invalid}[/] invalid"
+        f"[bold]{r.config}[/]  "
+        f"{r.n_appeared}/{r.n_projects} projects ranked  ·  "
+        f"{r.n_judgments} judgments  ·  "
+        f"[yellow]{r.n_invalid}[/] invalid"
     )
-    if n_winners:
+    if r.n_winners:
         console.print(
-            f"  winners: {n_winners_appeared}/{n_winners}  ·  "
-            f"percentile: median=[cyan]{np.median(winner_pcts):.3f}[/] "
-            f"mean=[cyan]{np.mean(winner_pcts):.3f}[/]"
+            f"  winners: {r.n_winners_appeared}/{r.n_winners}  ·  "
+            f"percentile: median=[cyan]{np.median(r.winner_pcts):.3f}[/] "
+            f"mean=[cyan]{np.mean(r.winner_pcts):.3f}[/]"
         )
 
     # ── recall@K ──
-    if n_winners and n > 0:
+    if r.n_winners and r.n_projects > 0:
         rec_table = Table(title="Recall@K", title_justify="left", show_header=True)
         rec_table.add_column("K", justify="right")
         rec_table.add_column("recall", justify="right")
         rec_table.add_column("random", justify="right")
         rec_table.add_column("lift", justify="right")
         for k in ks:
-            top_k = set(appeared_ids[:k])
-            hits = sum(1 for w in appeared_winners if w in top_k)
-            rec = hits / n_winners
-            rand = k / n
+            rec = r.recall_at_k[k]
+            rand = k / r.n_projects
             lift = rec / rand if rand > 0 else float("inf")
             color = "green" if lift > 1 else "red"
             rec_table.add_row(
@@ -125,15 +183,15 @@ def run(
     top_table.add_column("appearances", justify="right")
     top_table.add_column("W", justify="center")
     top_table.add_column("result", overflow="ellipsis", max_width=40)
-    for r, pid in enumerate(appeared_ids[:top]):
-        i = idx[pid]
-        p = projects[i]
+    for rk, pid in enumerate(r.appeared_ids[:top]):
+        i = r.idx[pid]
+        p = r.projects[i]
         winner_mark = "[bold green]✓[/]" if p.get("is_winner") else ""
         top_table.add_row(
-            str(r),
+            str(rk),
             p.get("title") or "",
-            f"{float(np.exp(log_skill[i])):.2f}",
-            str(int(pairs_per[i])),
+            f"{float(np.exp(r.log_skill[i])):.2f}",
+            str(int(r.pairs_per[i])),
             winner_mark,
             p.get("results") or "",
         )
