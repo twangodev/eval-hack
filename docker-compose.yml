@@ -1,0 +1,59 @@
+services:
+  sglang:
+    image: voipmonitor/sglang:cu130
+    working_dir: /workspace
+    ipc: host
+    shm_size: "16gb"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      SGLANG_ENABLE_JIT_DEEPGEMM: "0"
+      SGLANG_ENABLE_DEEP_GEMM: "0"
+      NCCL_IB_DISABLE: "1"
+      NCCL_P2P_LEVEL: SYS
+      OMP_NUM_THREADS: "8"
+      SAFETENSORS_FAST_GPU: "1"
+    ports:
+      - "30000:30000"
+    volumes:
+      - ./:/workspace
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:30000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    command:
+      - python
+      - -m
+      - sglang.launch_server
+      - --model-path
+      - Qwen/Qwen3.5-27B
+      - --dtype
+      - bfloat16
+      - --attention-backend
+      - flashinfer
+      - --mem-fraction-static
+      - "0.90"
+      - --context-length
+      - "16384"
+      - --reasoning-parser
+      - qwen3
+      - --cuda-graph-max-bs
+      - "128"
+      - --max-running-requests
+      - "128"
+      - --enable-mixed-chunk
+      - --mamba-ssm-dtype
+      - bfloat16
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "30000"

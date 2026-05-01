@@ -1,6 +1,27 @@
 [project]
-name = "eval-hack"
+name = "devpost-hacks"
 version = "0.1.0"
-description = "Add your description here"
+description = "Pairwise LLM-judge dataset builder over hackathon projects (Devpost)"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "typer>=0.12",
+    "pyarrow>=17",
+    "openai>=1.50",
+    "choix>=0.3.5",
+    "datasets>=4.8.5",
+]
+
+[project.scripts]
+devpost = "devpost.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/devpost"]
+
+[dependency-groups]
+dev = [
+    "huggingface-hub>=1.12.0",
+]
