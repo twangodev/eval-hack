@@ -21,18 +21,18 @@ x-sglang: &sglang
           - driver: nvidia
             count: all
             capabilities: [gpu]
+  ports:
+    - "30000:30000"
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:30000/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 60
+    start_period: 30s
 
 services:
-  sglang-large:
+  sglang-qwen3.5-27b:
     <<: *sglang
-    ports:
-      - "30000:30000"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:30000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
     command: [
       "python", "-m", "sglang.launch_server",
       "--model-path", "Qwen/Qwen3.5-27B",
@@ -50,16 +50,8 @@ services:
       "--port", "30000",
     ]
 
-  sglang-small:
+  sglang-qwen3.5-4b:
     <<: *sglang
-    ports:
-      - "30001:30001"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:30001/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
     command: [
       "python", "-m", "sglang.launch_server",
       "--model-path", "Qwen/Qwen3.5-4B",
@@ -74,5 +66,21 @@ services:
       "--mamba-ssm-dtype", "bfloat16",
       "--mamba-scheduler-strategy", "extra_buffer",
       "--host", "0.0.0.0",
-      "--port", "30001",
+      "--port", "30000",
+    ]
+
+  sglang-gpt-oss-20b:
+    <<: *sglang
+    command: [
+      "python", "-m", "sglang.launch_server",
+      "--model-path", "openai/gpt-oss-20b",
+      "--attention-backend", "triton",
+      "--mem-fraction-static", "0.90",
+      "--context-length", "16384",
+      "--reasoning-parser", "gpt-oss",
+      "--cuda-graph-max-bs", "128",
+      "--max-running-requests", "128",
+      "--enable-mixed-chunk",
+      "--host", "0.0.0.0",
+      "--port", "30000",
     ]
