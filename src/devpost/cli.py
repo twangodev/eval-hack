@@ -144,11 +144,22 @@ def summary(
     ks: list[int] = typer.Option(
         [1, 5, 10, 20, 50], "--k", help="K values for recall@K (repeatable)"
     ),
+    bootstrap: int = typer.Option(
+        1000, "--bootstrap", "-B",
+        help="Bootstrap iterations for 95% CIs (default 1000; use 0 to skip)",
+    ),
+    workers: int = typer.Option(
+        24, "--workers", "-w", help="Parallel workers for bootstrap (default 24)"
+    ),
+    full: bool = typer.Option(
+        False, "--full",
+        help="Skip the held-out test split filter and include all pairs (contaminated for the FT judge)",
+    ),
 ) -> None:
-    """Aggregate cross-hackathon eval — the headline top-1 winner-match rate."""
+    """Cross-hackathon × cross-judge eval. Defaults to held-out test pairs only."""
     from devpost import summary as summary_mod
 
-    summary_mod.run(ks)
+    summary_mod.run(ks, B=bootstrap, workers=workers, full=full)
 
 
 @app.command()
