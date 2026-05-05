@@ -221,3 +221,7 @@ __marimo__/
 
 # Generated dataset artifacts
 data/
+!madhacks/data/
+
+# Local model weights (HF adapter / fine-tune outputs)
+models/
