@@ -84,6 +84,8 @@ async def _judge_one(
     extra = choice.message.model_extra or {}
     reasoning = extra.get("reasoning_content") or ""
     verdict = _parse_verdict(content)
+    if verdict == "invalid" and reasoning:
+        verdict = _parse_verdict(reasoning)  # judges that emit VERDICT inside the <think> block (e.g. our LoRA finetune)
     usage = resp.usage
     output_text = (
         f"<think>{reasoning}</think>\n{content}" if reasoning else content
