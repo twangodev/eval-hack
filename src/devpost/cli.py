@@ -128,7 +128,9 @@ def rank(
     ks: list[int] = typer.Option(
         [1, 5, 10, 20, 50], "--k", help="K values for recall@K (repeatable)"
     ),
-    top: int = typer.Option(20, "--top", help="How many top projects to print"),
+    top: int = typer.Option(
+        None, "--top", help="Limit ranking table to top N projects (default: print all)"
+    ),
 ) -> None:
     """Fit Bradley-Terry on judgments and print ranking + recall@K to stdout."""
     from devpost import rank as rank_mod

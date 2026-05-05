@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+import os
+
+# Set before numpy is imported by workers (fork inherits, but spawn re-reads env)
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
+import random
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -63,16 +72,15 @@ class RankResult:
     top1_hit: bool
 
 
-def compute(config: str, judgments_path: Path, ks: list[int]) -> RankResult:
-    """Fit BT and compute eval metrics for one hackathon. No I/O."""
-    projects = [p for p in _load_hf_projects(config) if _is_valid(p)]
-    project_ids = [_project_id(p) for p in projects]
-    winner_ids = {pid for pid, p in zip(project_ids, projects) if p.get("is_winner")}
-
-    judgments = list(iter_jsonl(judgments_path))
-    if not judgments:
-        raise SystemExit(f"no judgments in {judgments_path}")
-
+def _fit_and_rank(
+    config: str,
+    projects: list[dict],
+    project_ids: list[str],
+    winner_ids: set[str],
+    judgments: list[dict],
+    ks: list[int],
+) -> RankResult:
+    """Pure: build outcomes, fit BT, compute metrics. Used by both `compute` and bootstrap."""
     outcomes, idx, n_invalid = _build_outcomes(project_ids, judgments)
     n = len(project_ids)
 
@@ -94,7 +102,6 @@ def compute(config: str, judgments_path: Path, ks: list[int]) -> RankResult:
 
     appeared_winners = [w for w in winner_ids if w in rank_of]
     n_winners = len(winner_ids)
-    n_winners_appeared = len(appeared_winners)
     winner_pcts = [rank_of[w] / max(n_appeared, 1) for w in appeared_winners]
 
     recall_at_k: dict[int, float] = {}
@@ -104,15 +111,12 @@ def compute(config: str, judgments_path: Path, ks: list[int]) -> RankResult:
         recall_at_k[k] = hits / max(n_winners, 1)
 
     top1_id = appeared_ids[0] if appeared_ids else None
-    top1_project = projects[idx[top1_id]] if top1_id else None
-    top1_hit = top1_id in winner_ids if top1_id else False
-
     return RankResult(
         config=config,
         n_projects=n,
         n_appeared=n_appeared,
         n_winners=n_winners,
-        n_winners_appeared=n_winners_appeared,
+        n_winners_appeared=len(appeared_winners),
         n_judgments=len(judgments),
         n_invalid=n_invalid,
         log_skill=log_skill,
@@ -125,21 +129,137 @@ def compute(config: str, judgments_path: Path, ks: list[int]) -> RankResult:
         winner_pcts=winner_pcts,
         recall_at_k=recall_at_k,
         top1_id=top1_id,
-        top1_project=top1_project,
-        top1_hit=top1_hit,
+        top1_project=projects[idx[top1_id]] if top1_id else None,
+        top1_hit=top1_id in winner_ids if top1_id else False,
     )
+
+
+def compute(
+    config: str,
+    judgments_path: Path,
+    ks: list[int],
+    pair_id_filter: set[str] | None = None,
+) -> RankResult:
+    """Load + fit BT + compute metrics for one (hackathon, judgments-file) pair.
+
+    `pair_id_filter`, if provided, restricts judgments to those pair_ids.
+    """
+    projects = [p for p in _load_hf_projects(config) if _is_valid(p)]
+    project_ids = [_project_id(p) for p in projects]
+    winner_ids = {pid for pid, p in zip(project_ids, projects) if p.get("is_winner")}
+
+    judgments = list(iter_jsonl(judgments_path))
+    if pair_id_filter is not None:
+        judgments = [j for j in judgments if j["pair_id"] in pair_id_filter]
+    if not judgments:
+        raise SystemExit(f"no judgments in {judgments_path}")
+
+    return _fit_and_rank(config, projects, project_ids, winner_ids, judgments, ks)
+
+
+# ── bootstrap ──────────────────────────────────────────────────────────────
+
+_BOOT: dict = {}  # state shared with worker processes via fork
+
+
+def _bootstrap_iter(seed: int) -> dict | None:
+    s = _BOOT
+    rng = random.Random(seed)
+    sampled = [rng.choice(s["pair_ids"]) for _ in range(len(s["pair_ids"]))]
+    judgments = [j for pid in sampled for j in s["judgments_by_pair"][pid]]
+
+    r = _fit_and_rank(
+        s["config"], s["projects"], s["project_ids"], s["winner_ids"], judgments, s["ks"]
+    )
+    return {
+        "top1_hit": r.top1_hit,
+        "median_pct": (
+            float(np.median(r.winner_pcts)) if r.winner_pcts else float("nan")
+        ),
+        **{f"r{k}": v for k, v in r.recall_at_k.items()},
+    }
+
+
+def _ci(values: list[float]) -> dict:
+    arr = np.asarray(values, dtype=float)
+    arr = arr[~np.isnan(arr)]
+    if len(arr) == 0:
+        return {"mean": float("nan"), "lo": float("nan"), "hi": float("nan")}
+    return {
+        "mean": float(arr.mean()),
+        "lo": float(np.percentile(arr, 2.5)),
+        "hi": float(np.percentile(arr, 97.5)),
+    }
+
+
+def bootstrap(
+    config: str,
+    judgments_path: Path,
+    ks: list[int],
+    B: int = 1000,
+    workers: int = 24,
+    base_seed: int = 42,
+    pair_id_filter: set[str] | None = None,
+) -> dict | None:
+    """B iterations of pair-resampling → BT refit → metrics. Returns 95% CIs."""
+    projects = [p for p in _load_hf_projects(config) if _is_valid(p)]
+    project_ids = [_project_id(p) for p in projects]
+    winner_ids = {pid for pid, p in zip(project_ids, projects) if p.get("is_winner")}
+
+    judgments = list(iter_jsonl(judgments_path))
+    if pair_id_filter is not None:
+        judgments = [j for j in judgments if j["pair_id"] in pair_id_filter]
+    if not judgments:
+        return None
+
+    by_pair: dict[str, list[dict]] = defaultdict(list)
+    for j in judgments:
+        by_pair[j["pair_id"]].append(j)
+
+    _BOOT.update(
+        config=config,
+        projects=projects,
+        project_ids=project_ids,
+        winner_ids=winner_ids,
+        judgments_by_pair=dict(by_pair),
+        pair_ids=list(by_pair.keys()),
+        ks=ks,
+    )
+
+    seeds = list(range(base_seed, base_seed + B))
+    if workers <= 1:
+        results = [_bootstrap_iter(s) for s in seeds]
+    else:
+        chunksize = max(1, B // (workers * 4))
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            results = list(ex.map(_bootstrap_iter, seeds, chunksize=chunksize))
+    results = [r for r in results if r is not None]
+
+    return {
+        "B": B,
+        "n_judgments": len(judgments),
+        "n_projects": len(projects),
+        "n_winners": len(winner_ids),
+        "model": judgments[0].get("model") if judgments else None,
+        "top1_hit_rate": float(np.mean([r["top1_hit"] for r in results])),
+        "recall": {k: _ci([r[f"r{k}"] for r in results]) for k in ks},
+        "median_pct": _ci([r["median_pct"] for r in results]),
+    }
+
+
+# ── single-hackathon CLI render ────────────────────────────────────────────
 
 
 def run(
     config: str,
     judgments_path: Path,
     ks: list[int],
-    top: int = 20,
+    top: int | None = None,
 ) -> None:
     console = Console()
     r = compute(config, judgments_path, ks)
 
-    # ── header ──
+    # header
     console.print(
         f"[bold]{r.config}[/]  "
         f"{r.n_appeared}/{r.n_projects} projects ranked  ·  "
@@ -153,7 +273,7 @@ def run(
             f"mean=[cyan]{np.mean(r.winner_pcts):.3f}[/]"
         )
 
-    # ── recall@K ──
+    # recall@K
     if r.n_winners and r.n_projects > 0:
         rec_table = Table(title="Recall@K", title_justify="left", show_header=True)
         rec_table.add_column("K", justify="right")
@@ -173,17 +293,21 @@ def run(
             )
         console.print(rec_table)
 
-    # ── top N ──
-    top_table = Table(
-        title=f"Top {top} (by BT score)", title_justify="left", show_header=True
+    # ranking
+    n_show = top if top is not None else len(r.appeared_ids)
+    title = (
+        f"Top {n_show} (by BT score)"
+        if top is not None
+        else f"All {n_show} ranked projects (by BT score)"
     )
+    top_table = Table(title=title, title_justify="left", show_header=True)
     top_table.add_column("rank", justify="right")
     top_table.add_column("title", overflow="ellipsis", max_width=40)
     top_table.add_column("score", justify="right")
     top_table.add_column("appearances", justify="right")
     top_table.add_column("W", justify="center")
     top_table.add_column("result", overflow="ellipsis", max_width=40)
-    for rk, pid in enumerate(r.appeared_ids[:top]):
+    for rk, pid in enumerate(r.appeared_ids[:n_show]):
         i = r.idx[pid]
         p = r.projects[i]
         winner_mark = "[bold green]✓[/]" if p.get("is_winner") else ""
