@@ -22,6 +22,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/devpost"]
 
+[tool.uv.workspace]
+members = ["madhacks"]
+
 [dependency-groups]
 dev = [
     "huggingface-hub>=1.12.0",
