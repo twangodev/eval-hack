@@ -19,7 +19,8 @@ private MadHacks Plackett-Luce ranking.
 - [`twangodev/devpost-hacks`](https://huggingface.co/datasets/twangodev/devpost-hacks)
   — 2,222 projects across 9 hackathons + GitHub READMEs
 - [`twangodev/devpost-hacks-judgments`](https://huggingface.co/datasets/twangodev/devpost-hacks-judgments)
-  — 31,522 SFT-format pairwise judgments from Qwen3.5-27B
+  — 63,044 SFT-format pairwise judgments from Qwen3.5-27B and Qwen3.5-4B
+  (31,522 each)
 
 ## Pipeline
 
@@ -28,7 +29,7 @@ uv sync
 devpost enrich -s <hackathon>.json             # GitHub READMEs → projects parquet
 devpost pairs  -c <hackathon> --n 500          # sample pairs from the HF dataset
 docker compose up -d sglang-large              # Qwen3.5-27B,        port 30000
-docker compose up -d sglang-small              # Qwen3-4B-Thinking,  port 30001
+docker compose up -d sglang-small              # Qwen3.5-4B,         port 30001
 devpost judge  --pairs data/<h>/pairs.jsonl    # → judgments.jsonl (resumable; --base-url to pick a judge)
 devpost rank   -c <hackathon>                  # → ranking.parquet + eval.json
 devpost export projects | judgments            # stage for HF upload
