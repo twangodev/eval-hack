@@ -69,6 +69,40 @@ services:
       "--port", "30000",
     ]
 
+  sglang-qwen3-4b-2507:
+    <<: *sglang
+    command: [
+      "python", "-m", "sglang.launch_server",
+      "--model-path", "Qwen/Qwen3-4B-Instruct-2507",
+      "--dtype", "bfloat16",
+      "--attention-backend", "flashinfer",
+      "--mem-fraction-static", "0.90",
+      "--context-length", "16384",
+      "--reasoning-parser", "qwen3",
+      "--cuda-graph-max-bs", "128",
+      "--max-running-requests", "128",
+      "--enable-mixed-chunk",
+      "--host", "0.0.0.0",
+      "--port", "30000",
+    ]
+
+  sglang-qwen3-4b-judge:
+    <<: *sglang
+    command: [
+      "python", "-m", "sglang.launch_server",
+      "--model-path", "twangodev/devpost-hacks-qwen3-4b-judge",
+      "--dtype", "bfloat16",
+      "--attention-backend", "flashinfer",
+      "--mem-fraction-static", "0.90",
+      "--context-length", "16384",
+      "--reasoning-parser", "qwen3",
+      "--cuda-graph-max-bs", "128",
+      "--max-running-requests", "128",
+      "--enable-mixed-chunk",
+      "--host", "0.0.0.0",
+      "--port", "30000",
+    ]
+
   sglang-gpt-oss-20b:
     <<: *sglang
     command: [
