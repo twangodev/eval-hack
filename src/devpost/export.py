@@ -98,17 +98,26 @@ def _read_judgment_rows(path: Path) -> list[dict]:
 
 
 def stage_judgments(out_dir: Path | None = None) -> int:
+    """Bundle all judgments*.jsonl files under data/<hackathon>/ into HF layout.
+
+    Multiple judges' files (e.g. judgments.jsonl + judgments-small.jsonl) are
+    concatenated per hackathon; each row's `model` field disambiguates them.
+    """
     out_dir = out_dir or JUDGMENTS_OUT
     data_dir = out_dir / "data"
-    sources = sorted(JUDGMENTS_SRC.glob("*/judgments.jsonl"))
-    if not sources:
-        raise SystemExit(f"no judgments.jsonl under {JUDGMENTS_SRC}/*/")
+
+    by_hackathon: dict[str, list[Path]] = {}
+    for src in sorted(JUDGMENTS_SRC.glob("*/judgments*.jsonl")):
+        by_hackathon.setdefault(src.parent.name, []).append(src)
+    if not by_hackathon:
+        raise SystemExit(f"no judgments*.jsonl under {JUDGMENTS_SRC}/*/")
 
     tables: list[pa.Table] = []
-    print(f"  {'hackathon':<28} {'rows':>6}  {'MB':>6}")
-    for src in sources:
-        hackathon = src.parent.name
-        rows = _read_judgment_rows(src)
+    print(f"  {'hackathon':<28} {'rows':>6}  {'MB':>6}  files")
+    for hackathon, sources in sorted(by_hackathon.items()):
+        rows: list[dict] = []
+        for src in sources:
+            rows.extend(_read_judgment_rows(src))
         if not rows:
             continue
         t = pa.Table.from_pylist(rows, schema=JUDGMENT_SCHEMA)
@@ -116,7 +125,8 @@ def stage_judgments(out_dir: Path | None = None) -> int:
         _write(t, out)
         size_mb = out.stat().st_size / 1024 / 1024
         tables.append(t)
-        print(f"  {hackathon:<28} {t.num_rows:>6}  {size_mb:>6.1f}")
+        files = ", ".join(s.name for s in sources)
+        print(f"  {hackathon:<28} {t.num_rows:>6}  {size_mb:>6.1f}  {files}")
 
     combined = pa.concat_tables(tables)
     out = data_dir / "all" / "train.parquet"
