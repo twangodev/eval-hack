@@ -178,8 +178,10 @@ def run(B: int = 1000, workers: int = 24, base_seed: int = 42) -> dict | None:
     }
 
 
-def top_n_rankings(n: int = 15) -> dict | None:
-    """Side-by-side ranking data: human PL + each judge's BT, top-N and bottom-N."""
+def top_n_rankings(
+    n_display: int = 15, ks: tuple[int, ...] = (5, 10, 20, 50)
+) -> dict | None:
+    """Side-by-side ranking data + |PL top/bot-K ∩ judge top/bot-K| for each K."""
     if not available():
         return None
     pl = _pl_by_title()
@@ -190,30 +192,43 @@ def top_n_rankings(n: int = 15) -> dict | None:
     judgment_files = sorted(Path(f"data/{HACKATHON}").glob("judgments*.jsonl"))
     top_rankings: list[tuple[str, list[tuple[str, float, bool]]]] = []
     bot_rankings: list[tuple[str, list[tuple[str, float, bool]]]] = []
+    overlap_top: dict[str, dict[int, int]] = {}  # model → K → hits
+    overlap_bot: dict[str, dict[int, int]] = {}
     for jf in judgment_files:
         rows = list(iter_jsonl(jf))
         if not rows:
             continue
         model = rows[0].get("model") or jf.name
         r = rank_mod.compute(HACKATHON, jf, ks=[1])
+
         def _slice(ids):
-            out = []
-            for pid in ids:
-                i = r.idx[pid]
-                p = r.projects[i]
-                out.append((p["title"], r.log_skill[i], bool(p.get("is_winner"))))
-            return out
-        top_rankings.append((model, _slice(r.appeared_ids[:n])))
-        bot_rankings.append((model, _slice(r.appeared_ids[-n:])))
+            return [
+                (r.projects[r.idx[pid]]["title"], r.log_skill[r.idx[pid]],
+                 bool(r.projects[r.idx[pid]].get("is_winner")))
+                for pid in ids
+            ]
+        top_rankings.append((model, _slice(r.appeared_ids[:n_display])))
+        bot_rankings.append((model, _slice(r.appeared_ids[-n_display:])))
+
+        bt_titles = [r.projects[r.idx[pid]]["title"] for pid in r.appeared_ids]
+        overlap_top[model] = {
+            k: len(set(pl_sorted[:k]) & set(bt_titles[:k])) for k in ks
+        }
+        overlap_bot[model] = {
+            k: len(set(pl_sorted[-k:]) & set(bt_titles[-k:])) for k in ks
+        }
 
     return {
-        "n": n,
+        "n": n_display,
         "n_pl": len(pl_sorted),
-        "pl_top": pl_sorted[:n],
-        "pl_bot": pl_sorted[-n:],
+        "ks": list(ks),
+        "pl_top": pl_sorted[:n_display],
+        "pl_bot": pl_sorted[-n_display:],
         "pl_top10": pl_top10,
         "pl_bot10": pl_bot10,
         "rankings": top_rankings,      # back-compat alias for top
         "top_rankings": top_rankings,
         "bot_rankings": bot_rankings,
+        "overlap_top": overlap_top,
+        "overlap_bot": overlap_bot,
     }

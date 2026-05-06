@@ -343,7 +343,9 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
                 console.print(arc_table)
 
             # ── side-by-side top-N + bottom-N rankings ──
-            ranks = madhacks_eval.top_n_rankings(n=15)
+            ranks = madhacks_eval.top_n_rankings(
+                n_display=15, ks=tuple(k for k in ks if k > 1)
+            )
             if ranks is not None:
                 short_name = {
                     "Qwen/Qwen3-4B-Instruct-2507": "2507 (base)",
@@ -386,21 +388,27 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
 
                 _render("top", ranks["pl_top"], ranks["pl_top10"],
                         ranks["top_rankings"], rank_offset=0)
-                console.print()
-                console.print("[bold]PL top-10 ∩ judge top-10 (out of 10):[/]")
-                for model, ranking in ranks["top_rankings"]:
-                    hits = ranks["pl_top10"] & {t for t, _, _ in ranking[:10]}
-                    console.print(
-                        f"  {short_name.get(model, model):<18} {len(hits):>2}/10  →  {sorted(hits)}"
-                    )
 
+                def _overlap_table(side: str, overlap: dict[str, dict[int, int]]) -> Table:
+                    t = Table(
+                        title=f"PL {side}-K ∩ judge {side}-K (madhacks-fall-2025)",
+                        title_justify="left", show_header=True,
+                    )
+                    t.add_column("model", overflow="ellipsis", max_width=24)
+                    for k in ranks["ks"]:
+                        t.add_column(f"K={k}", justify="right")
+                    for model, _ in ranks["top_rankings"]:
+                        cells = [
+                            f"{overlap[model][k]}/{k} ({overlap[model][k]/k:.0%})"
+                            for k in ranks["ks"]
+                        ]
+                        t.add_row(short_name.get(model, model), *cells)
+                    return t
+
+                console.print()
+                console.print(_overlap_table("top", ranks["overlap_top"]))
                 console.print()
                 _render("bottom", ranks["pl_bot"], ranks["pl_bot10"],
                         ranks["bot_rankings"], rank_offset=ranks["n_pl"] - ranks["n"])
                 console.print()
-                console.print("[bold]PL bottom-10 ∩ judge bottom-10 (out of 10):[/]")
-                for model, ranking in ranks["bot_rankings"]:
-                    hits = ranks["pl_bot10"] & {t for t, _, _ in ranking[-10:]}
-                    console.print(
-                        f"  {short_name.get(model, model):<18} {len(hits):>2}/10  →  {sorted(hits)}"
-                    )
+                console.print(_overlap_table("bottom", ranks["overlap_bot"]))
