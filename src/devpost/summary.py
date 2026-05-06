@@ -247,6 +247,52 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
 
         console.print(pair_table)
 
+    # ── paired Wilcoxon signed-rank on per-(hackathon × judge) recall@K ──
+    if len(models) >= 2:
+        from scipy.stats import wilcoxon as _wilcoxon
+
+        for metric_name, getter in [
+            ("recall@10", lambda p: p.recall_at_k.get(10, 0.0)),
+            ("recall@50", lambda p: p.recall_at_k.get(50, 0.0)),
+        ]:
+            metric = {(r["hackathon"], r["model"]): getter(r["point"]) for r in rows}
+            wt = Table(
+                title=f"Paired Wilcoxon — {metric_name} (cross-hackathon)",
+                title_justify="left", show_header=True,
+            )
+            wt.add_column("judge A", overflow="ellipsis", max_width=28)
+            wt.add_column("judge B", overflow="ellipsis", max_width=28)
+            wt.add_column("N", justify="right")
+            wt.add_column("med Δ", justify="right")
+            wt.add_column("mean Δ", justify="right")
+            wt.add_column("p", justify="right")
+            wt.add_column("sig", justify="center")
+            for ja, jb in combinations(models, 2):
+                shared = sorted(
+                    {h for (h, m) in metric if m == ja}
+                    & {h for (h, m) in metric if m == jb}
+                )
+                if len(shared) < 4:
+                    continue
+                x = np.array([metric[(h, ja)] for h in shared])
+                y = np.array([metric[(h, jb)] for h in shared])
+                d = x - y
+                try:
+                    _, p_val = _wilcoxon(x, y, zero_method="zsplit")
+                except ValueError:
+                    p_val = float("nan")
+                sig = (
+                    "[bold green]**[/]" if p_val < 0.05
+                    else "[yellow]·[/]" if p_val < 0.10
+                    else ""
+                )
+                wt.add_row(
+                    ja, jb, str(len(shared)),
+                    f"{np.median(d):+.3f}", f"{d.mean():+.3f}",
+                    f"{p_val:.3f}", sig,
+                )
+            console.print(wt)
+
     # ── madhacks PL secondary eval (if private real_names.csv present) ──
     from devpost import madhacks_eval
 
@@ -295,3 +341,55 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
                         f"{p:.1%}",
                     )
                 console.print(arc_table)
+
+            # ── side-by-side top-N rankings ──
+            ranks = madhacks_eval.top_n_rankings(n=15)
+            if ranks is not None:
+                rt = Table(
+                    title=(
+                        f"Top {ranks['n']} per judge — madhacks-fall-2025  "
+                        f"([yellow]●[/]=PL top-10  [green]✓[/]=Devpost winner)"
+                    ),
+                    title_justify="left", show_header=True,
+                )
+                rt.add_column("rank", justify="right")
+                rt.add_column("Human PL", overflow="ellipsis", max_width=24)
+                short_name = {
+                    "Qwen/Qwen3-4B-Instruct-2507": "2507 (base)",
+                    "Qwen/Qwen3.5-4B": "Qwen3.5-4B",
+                    "Qwen/Qwen3.5-27B": "Qwen3.5-27B",
+                    "openai/gpt-oss-20b": "gpt-oss-20b",
+                    "twangodev/devpost-hacks-qwen3-4b-judge": "FT (4b-judge)",
+                }
+                for model, _ in ranks["rankings"]:
+                    rt.add_column(short_name.get(model, model), overflow="ellipsis", max_width=24)
+                for rk in range(ranks["n"]):
+                    row = [str(rk + 1)]
+                    pl_top = ranks["pl_top"]
+                    if rk < len(pl_top):
+                        row.append(f"[yellow]●[/] {pl_top[rk]}")
+                    else:
+                        row.append("")
+                    for _, ranking in ranks["rankings"]:
+                        if rk < len(ranking):
+                            title, _s, is_winner = ranking[rk]
+                            marks = []
+                            if title in ranks["pl_top10"]:
+                                marks.append("[yellow]●[/]")
+                            if is_winner:
+                                marks.append("[green]✓[/]")
+                            row.append(("".join(marks) + " " if marks else "") + title)
+                        else:
+                            row.append("")
+                    rt.add_row(*row)
+                console.print(rt)
+
+                # PL top-10 ∩ judge top-10 summary
+                console.print()
+                console.print("[bold]PL top-10 ∩ judge top-10 (out of 10):[/]")
+                for model, ranking in ranks["rankings"]:
+                    bt_top10 = {t for t, _, _ in ranking[:10]}
+                    hits = ranks["pl_top10"] & bt_top10
+                    console.print(
+                        f"  {short_name.get(model, model):<18} {len(hits):>2}/10  →  {sorted(hits)}"
+                    )

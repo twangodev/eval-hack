@@ -176,3 +176,34 @@ def run(B: int = 1000, workers: int = 24, base_seed: int = 42) -> dict | None:
         "n_pairs": len(pair_ids),
         "B": B,
     }
+
+
+def top_n_rankings(n: int = 15) -> dict | None:
+    """Returns side-by-side ranking data: human PL top-N + each judge's BT top-N."""
+    if not available():
+        return None
+    pl = _pl_by_title()
+    pl_sorted = sorted(pl, key=lambda t: -pl[t])
+    pl_top10 = set(pl_sorted[:10])
+
+    judgment_files = sorted(Path(f"data/{HACKATHON}").glob("judgments*.jsonl"))
+    rankings: list[tuple[str, list[tuple[str, float, bool]]]] = []
+    for jf in judgment_files:
+        rows = list(iter_jsonl(jf))
+        if not rows:
+            continue
+        model = rows[0].get("model") or jf.name
+        r = rank_mod.compute(HACKATHON, jf, ks=[1])
+        ranking: list[tuple[str, float, bool]] = []
+        for pid in r.appeared_ids[:n]:
+            i = r.idx[pid]
+            p = r.projects[i]
+            ranking.append((p["title"], r.log_skill[i], bool(p.get("is_winner"))))
+        rankings.append((model, ranking))
+
+    return {
+        "n": n,
+        "pl_top": pl_sorted[:n],
+        "pl_top10": pl_top10,
+        "rankings": rankings,
+    }
