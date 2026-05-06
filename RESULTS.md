@@ -52,7 +52,7 @@ $ uv run devpost summary --bootstrap 1000
 Loading held-out test pair_ids (cs639 split, seed=42)...
 Eval scope: held-out test set (2430 pair_ids)  ·  39 (hackathon × judge) combos  ·  B=1000  ·  workers=24
 
-(147.9s)
+(148.0s)
 
 Per (hackathon × judge) — point estimate + 95% bootstrap CI                                                                
 ┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
@@ -201,10 +201,49 @@ Top 15 per judge — madhacks-fall-2025  (●=PL top-10  ✓=Devpost winner)
 │   15 │ ● SquadSync              │ Replae                   │ ● Lexon                  │ Meridian                 │ Stellar Insight Labs │ LucidCare                │
 └──────┴──────────────────────────┴──────────────────────────┴──────────────────────────┴──────────────────────────┴──────────────────────┴──────────────────────────┘
 
-PL top-10 ∩ judge top-10 (out of 10):
-  2507 (base)         1/10  →  ['CV Crash Insurance Fraud Detection']
-  gpt-oss-20b         0/10  →  []
-  FT (4b-judge)       2/10  →  ['CV Crash Insurance Fraud Detection', 'ChordSight']
-  Qwen3.5-4B          0/10  →  []
-  Qwen3.5-27B         1/10  →  ['YATA_vioLin']
+PL top-K ∩ judge top-K (madhacks-fall-2025)                         
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ model         ┃      K=5 ┃       K=10 ┃       K=20 ┃        K=50 ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ 2507 (base)   │ 0/5 (0%) │ 1/10 (10%) │ 6/20 (30%) │ 28/50 (56%) │
+│ gpt-oss-20b   │ 0/5 (0%) │  0/10 (0%) │ 5/20 (25%) │ 29/50 (58%) │
+│ FT (4b-judge) │ 0/5 (0%) │ 2/10 (20%) │ 8/20 (40%) │ 27/50 (54%) │
+│ Qwen3.5-4B    │ 0/5 (0%) │  0/10 (0%) │ 5/20 (25%) │ 27/50 (54%) │
+│ Qwen3.5-27B   │ 0/5 (0%) │ 1/10 (10%) │ 5/20 (25%) │ 27/50 (54%) │
+└───────────────┴──────────┴────────────┴────────────┴─────────────┘
+
+Bottom 15 per judge — madhacks-fall-2025  (●=PL bottom-10  ✓=Devpost winner)                                                                                       
+┏━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ rank ┃ Human PL                 ┃ 2507 (base)            ┃ gpt-oss-20b              ┃ FT (4b-judge)           ┃ Qwen3.5-4B             ┃ Qwen3.5-27B            ┃
+┡━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│   99 │ ● LeetBattles            │ BlueGuide              │ ● It's Movie Night       │ NicheCard               │ Voice Verse            │ RecipeAI               │
+│  100 │ ● AIisa                  │ Mad Snacks             │ Urban Explorer's         │ ● NutriView             │ LeetBattles            │ ● NutriView            │
+│      │                          │                        │ Nightmare                │                         │                        │                        │
+│  101 │ ● ENHANCED ENROLL        │ Penni Personal Finance │ MindfulCompawnion        │ RecipeAI                │ ● NutriView            │ ● UncTracker           │
+│  102 │ ● Lookout –              │ 6 7 Counter            │ ✓ Bob's Businesses       │ ● VocalDNA              │ ● UncTracker           │ Madison Marketplace    │
+│      │ Community-Powered        │                        │                          │                         │                        │                        │
+│      │ Emergency Safety App     │                        │                          │                         │                        │                        │
+│  103 │ ● SpotShare              │ ● UncTracker           │ BlueGuide                │ Madison Marketplace     │ ● It's Movie Night     │ ✓ FocusMate            │
+│  104 │ ● It's Movie Night       │ ● VocalDNA             │ ● NutriView              │ BlueGuide               │ RecipeAI               │ ClearMeet              │
+│  105 │ ● VocalDNA               │ RecipeAI               │ 6G Conceptual Simulator  │ 6G Conceptual Simulator │ 6-7X Quantum Advantage │ Budget Besties         │
+│  106 │ ● NeuroCursor            │ 6-7X Quantum Advantage │ 6-7X Quantum Advantage   │ Voice Verse             │ SafePlate              │ ✓ Bob's Businesses     │
+│  107 │ ● Stellar Insight Labs   │ ● NutriView            │ SafePlate                │ ✓ Bob's Businesses      │ ConnectU               │ SafePlate              │
+│  108 │ ● Recipe Manager         │ Budget Besties         │ Budget Besties           │ Gnostic                 │ Budget Besties         │ ● VocalDNA             │
+│  109 │ ● FaunaVision            │ SafePlate              │ ● A-Meal                 │ Budget Besties          │ WhatsTheMove           │ 6-7X Quantum Advantage │
+│  110 │ ● NoFi                   │ ✓ FocusMate            │ ✓ FocusMate              │ ● A-Meal                │ 6 7 Counter            │ WhatsTheMove           │
+│  111 │ ● A-Meal                 │ WhatsTheMove           │ 6 7 Counter              │ WhatsTheMove            │ Gnostic                │ 6 7 Counter            │
+│  112 │ ● NutriView              │ Voice Verse            │ WhatsTheMove             │ 6 7 Counter             │ ✓ FocusMate            │ Gnostic                │
+│  113 │ ● UncTracker             │ ● A-Meal               │ Voice Verse              │ SafePlate               │ ● A-Meal               │ ● A-Meal               │
+└──────┴──────────────────────────┴────────────────────────┴──────────────────────────┴─────────────────────────┴────────────────────────┴────────────────────────┘
+
+PL bottom-K ∩ judge bottom-K (madhacks-fall-2025)                    
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ model         ┃       K=5 ┃       K=10 ┃       K=20 ┃        K=50 ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ 2507 (base)   │ 1/5 (20%) │ 3/10 (30%) │ 5/20 (25%) │ 28/50 (56%) │
+│ gpt-oss-20b   │ 1/5 (20%) │ 2/10 (20%) │ 6/20 (30%) │ 29/50 (58%) │
+│ FT (4b-judge) │ 1/5 (20%) │ 1/10 (10%) │ 6/20 (30%) │ 28/50 (56%) │
+│ Qwen3.5-4B    │ 1/5 (20%) │ 1/10 (10%) │ 8/20 (40%) │ 28/50 (56%) │
+│ Qwen3.5-27B   │ 1/5 (20%) │ 2/10 (20%) │ 5/20 (25%) │ 27/50 (54%) │
+└───────────────┴───────────┴────────────┴────────────┴─────────────┘
 ```
