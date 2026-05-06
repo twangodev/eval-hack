@@ -27,5 +27,6 @@ members = ["madhacks"]
 
 [dependency-groups]
 dev = [
+    "hf-transfer>=0.1.9",
     "huggingface-hub>=1.12.0",
 ]
