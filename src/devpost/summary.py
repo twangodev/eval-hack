@@ -342,18 +342,9 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
                     )
                 console.print(arc_table)
 
-            # ── side-by-side top-N rankings ──
+            # ── side-by-side top-N + bottom-N rankings ──
             ranks = madhacks_eval.top_n_rankings(n=15)
             if ranks is not None:
-                rt = Table(
-                    title=(
-                        f"Top {ranks['n']} per judge — madhacks-fall-2025  "
-                        f"([yellow]●[/]=PL top-10  [green]✓[/]=Devpost winner)"
-                    ),
-                    title_justify="left", show_header=True,
-                )
-                rt.add_column("rank", justify="right")
-                rt.add_column("Human PL", overflow="ellipsis", max_width=24)
                 short_name = {
                     "Qwen/Qwen3-4B-Instruct-2507": "2507 (base)",
                     "Qwen/Qwen3.5-4B": "Qwen3.5-4B",
@@ -361,35 +352,55 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
                     "openai/gpt-oss-20b": "gpt-oss-20b",
                     "twangodev/devpost-hacks-qwen3-4b-judge": "FT (4b-judge)",
                 }
-                for model, _ in ranks["rankings"]:
-                    rt.add_column(short_name.get(model, model), overflow="ellipsis", max_width=24)
-                for rk in range(ranks["n"]):
-                    row = [str(rk + 1)]
-                    pl_top = ranks["pl_top"]
-                    if rk < len(pl_top):
-                        row.append(f"[yellow]●[/] {pl_top[rk]}")
-                    else:
-                        row.append("")
-                    for _, ranking in ranks["rankings"]:
-                        if rk < len(ranking):
-                            title, _s, is_winner = ranking[rk]
-                            marks = []
-                            if title in ranks["pl_top10"]:
-                                marks.append("[yellow]●[/]")
-                            if is_winner:
-                                marks.append("[green]✓[/]")
-                            row.append(("".join(marks) + " " if marks else "") + title)
+
+                def _render(side: str, pl_list: list[str], pl_set10: set[str],
+                            judge_rankings: list, rank_offset: int):
+                    title = (
+                        f"{side.capitalize()} {ranks['n']} per judge — madhacks-fall-2025  "
+                        f"([yellow]●[/]=PL {side}-10  [green]✓[/]=Devpost winner)"
+                    )
+                    t = Table(title=title, title_justify="left", show_header=True)
+                    t.add_column("rank", justify="right")
+                    t.add_column("Human PL", overflow="ellipsis", max_width=24)
+                    for model, _ in judge_rankings:
+                        t.add_column(short_name.get(model, model), overflow="ellipsis", max_width=24)
+                    for rk in range(ranks["n"]):
+                        row = [str(rk + 1 + rank_offset)]
+                        if rk < len(pl_list):
+                            row.append(f"[yellow]●[/] {pl_list[rk]}")
                         else:
                             row.append("")
-                    rt.add_row(*row)
-                console.print(rt)
+                        for _, ranking in judge_rankings:
+                            if rk < len(ranking):
+                                ttl, _s, is_winner = ranking[rk]
+                                marks = []
+                                if ttl in pl_set10:
+                                    marks.append("[yellow]●[/]")
+                                if is_winner:
+                                    marks.append("[green]✓[/]")
+                                row.append(("".join(marks) + " " if marks else "") + ttl)
+                            else:
+                                row.append("")
+                        t.add_row(*row)
+                    console.print(t)
 
-                # PL top-10 ∩ judge top-10 summary
+                _render("top", ranks["pl_top"], ranks["pl_top10"],
+                        ranks["top_rankings"], rank_offset=0)
                 console.print()
                 console.print("[bold]PL top-10 ∩ judge top-10 (out of 10):[/]")
-                for model, ranking in ranks["rankings"]:
-                    bt_top10 = {t for t, _, _ in ranking[:10]}
-                    hits = ranks["pl_top10"] & bt_top10
+                for model, ranking in ranks["top_rankings"]:
+                    hits = ranks["pl_top10"] & {t for t, _, _ in ranking[:10]}
+                    console.print(
+                        f"  {short_name.get(model, model):<18} {len(hits):>2}/10  →  {sorted(hits)}"
+                    )
+
+                console.print()
+                _render("bottom", ranks["pl_bot"], ranks["pl_bot10"],
+                        ranks["bot_rankings"], rank_offset=ranks["n_pl"] - ranks["n"])
+                console.print()
+                console.print("[bold]PL bottom-10 ∩ judge bottom-10 (out of 10):[/]")
+                for model, ranking in ranks["bot_rankings"]:
+                    hits = ranks["pl_bot10"] & {t for t, _, _ in ranking[-10:]}
                     console.print(
                         f"  {short_name.get(model, model):<18} {len(hits):>2}/10  →  {sorted(hits)}"
                     )
