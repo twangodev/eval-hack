@@ -246,3 +246,52 @@ def run(ks: list[int], B: int = 1000, workers: int = 24, full: bool = False) -> 
             )
 
         console.print(pair_table)
+
+    # ── madhacks PL secondary eval (if private real_names.csv present) ──
+    from devpost import madhacks_eval
+
+    if not madhacks_eval.available():
+        console.print(
+            f"\n[dim]Skipping madhacks PL eval — set "
+            f"{madhacks_eval.REAL_NAMES_CSV} to enable.[/]"
+        )
+    else:
+        console.print()
+        console.print(
+            f"[dim]Madhacks PL eval (paired bootstrap, B={B}, workers={workers})...[/]"
+        )
+        result = madhacks_eval.run(B=B, workers=workers)
+        if result is None:
+            console.print("[dim](skipped)[/]")
+        else:
+            pl_table = Table(
+                title=(
+                    f"Madhacks-fall-2025: judge BT vs human PL  "
+                    f"(N={result['n_projects']} projects, {result['n_pairs']} pairs)"
+                ),
+                title_justify="left",
+                show_header=True,
+            )
+            pl_table.add_column("model", overflow="ellipsis", max_width=42)
+            pl_table.add_column("Spearman ρ [95% CI]", justify="right")
+            for model, (m, lo, hi) in sorted(
+                result["marginals"].items(), key=lambda kv: -kv[1][0]
+            ):
+                pl_table.add_row(model, f"{m:+.3f} [{lo:+.3f}, {hi:+.3f}]")
+            console.print(pl_table)
+
+            if result["arc"]:
+                arc_table = Table(
+                    title="Distillation arc (paired Δρ)",
+                    title_justify="left", show_header=True,
+                )
+                arc_table.add_column("comparison")
+                arc_table.add_column("Δρ [95% CI]", justify="right")
+                arc_table.add_column("P(Δ>0)", justify="right")
+                for label, (m, lo, hi, p) in result["arc"].items():
+                    arc_table.add_row(
+                        label.replace("_", " "),
+                        f"{m:+.4f} [{lo:+.3f}, {hi:+.3f}]",
+                        f"{p:.1%}",
+                    )
+                console.print(arc_table)
