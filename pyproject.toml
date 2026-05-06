@@ -1,7 +1,7 @@
 [project]
 name = "devpost-hacks"
 version = "0.1.0"
-description = "Pairwise LLM-judge dataset builder over hackathon projects (Devpost)"
+description = "Can LLMs judge hackathons?"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "typer>=0.12",
@@ -11,6 +11,10 @@ dependencies = [
     "datasets>=4.8.5",
     "rich>=15.0.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/twangodev/devpost-hacks"
+"HF Collection" = "https://huggingface.co/collections/twangodev/devpost-hacks"
 
 [project.scripts]
 devpost = "devpost.cli:app"
