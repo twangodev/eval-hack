@@ -163,6 +163,14 @@ def summary(
 
 
 @app.command()
+def stats() -> None:
+    """Dataset-description tables: row counts, verdicts, position consistency, latency."""
+    from devpost import stats as stats_mod
+
+    stats_mod.run()
+
+
+@app.command()
 def finalize(
     judgments: Path = typer.Option(..., "--judgments", help="Judgments JSONL"),
     out_dir: Path = typer.Option(
